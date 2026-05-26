@@ -9,7 +9,6 @@ pipeline {
  
     stages {
  
-        // ── Stage 1: Build ────────────────────────────────────────────────────
         stage('Build') {
             steps {
                 echo "=== BUILD STAGE ==="
@@ -20,7 +19,6 @@ pipeline {
             }
         }
  
-        // ── Stage 2: Test ─────────────────────────────────────────────────────
         stage('Test') {
             steps {
                 echo "=== TEST STAGE ==="
@@ -34,29 +32,16 @@ pipeline {
             }
         }
  
-        // ── Stage 3: Code Quality ─────────────────────────────────────────────
         stage('Code Quality') {
             steps {
                 echo "=== CODE QUALITY STAGE ==="
                 bat 'npm run test:coverage'
                 echo "Coverage report generated in coverage/ folder"
                 bat 'echo Code Quality check completed >> build-info.txt'
-            }
-            post {
-                always {
-                    publishHTML(target: [
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'coverage/lcov-report',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ])
-                }
+                archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
             }
         }
  
-        // ── Stage 4: Security ─────────────────────────────────────────────────
         stage('Security') {
             steps {
                 echo "=== SECURITY STAGE ==="
@@ -74,7 +59,6 @@ pipeline {
             }
         }
  
-        // ── Stage 5: Deploy ───────────────────────────────────────────────────
         stage('Deploy') {
             steps {
                 echo "=== DEPLOY STAGE (Staging) ==="
@@ -84,20 +68,16 @@ pipeline {
                     echo NODE_ENV=staging >> .env.staging
                     echo Staging config written.
                 '''
-                // Start app in background on staging port
                 bat '''
                     echo Starting application on port 3000...
                     start /B node src/app.js > staging.log 2>&1
                     timeout /t 5 /nobreak >nul
                     echo Deploy complete - app started
                 '''
-                bat '''
-                    curl -s http://localhost:3000/health || echo Health check - app starting up
-                '''
+                bat 'curl -s http://localhost:3000/health || echo Health check - app starting up'
             }
         }
  
-        // ── Stage 6: Release ──────────────────────────────────────────────────
         stage('Release') {
             steps {
                 echo "=== RELEASE STAGE ==="
@@ -114,7 +94,6 @@ pipeline {
             }
         }
  
-        // ── Stage 7: Monitoring ───────────────────────────────────────────────
         stage('Monitoring') {
             steps {
                 echo "=== MONITORING STAGE ==="
@@ -123,13 +102,13 @@ pipeline {
                     echo ================ >> monitoring-report.txt
                     echo Date: %DATE% %TIME% >> monitoring-report.txt
                     echo. >> monitoring-report.txt
-                    echo Checking application health endpoint...
+                    echo Checking application health endpoint... >> monitoring-report.txt
                     curl -s http://localhost:3000/health >> monitoring-report.txt 2>&1 || echo App health checked >> monitoring-report.txt
                     echo. >> monitoring-report.txt
-                    echo Checking metrics endpoint...
+                    echo Checking metrics endpoint... >> monitoring-report.txt
                     curl -s http://localhost:3000/metrics >> monitoring-report.txt 2>&1 || echo Metrics endpoint checked >> monitoring-report.txt
                     echo. >> monitoring-report.txt
-                    echo Monitoring check complete!
+                    echo Monitoring check complete! >> monitoring-report.txt
                     type monitoring-report.txt
                 '''
                 archiveArtifacts artifacts: 'monitoring-report.txt'
